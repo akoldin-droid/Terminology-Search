@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Terminology Search</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card-bg: #ffffff;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --radius: 10px;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #e0f2fe 0, #f9fafb 50%, #e5e7eb 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1100px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(248,250,252,0.98));
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 28px 22px 26px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      backdrop-filter: blur(14px);
+    }
+
+    @media (min-width: 768px) {
+      .app {
+        padding: 32px 32px 30px;
+      }
+    }
+
+    .header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .logo-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 11px;
+      background: conic-gradient(from 210deg, #2563eb, #4f46e5, #06b6d4, #22c55e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    @media (min-width: 900px) {
+      .layout {
+        flex-direction: row;
+        align-items: flex-start;
+      }
+    }
+
+    /* Left column: search & list */
+    .left-column {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1 1 240px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 34px 9px 30px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      font-size: 0.93rem;
+      outline: none;
+      transition: all 0.16s ease;
+      box-shadow: inset 0 0 0 0 rgba(37, 99, 235, 0.1);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      background: #ffffff;
+      box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.11), 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--text-muted);
+      padding: 0;
+      display: none;
+    }
+
+    .clear-btn.visible {
+      display: block;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .select {
+      padding: 7px 26px 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      font-size: 0.82rem;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: #1d4ed8;
+      font-size: 0.74rem;
+      font-weight: 500;
+    }
+
+    .results-list {
+      margin-top: 8px;
+      max-height: 400px;
+      overflow-y: auto;
+      padding-right: 4px;
+      border-radius: 12px;
+    }
+
+    .result-row {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .result-row:hover {
+      background: #eff6ff;
+      border-color: rgba(129, 140, 248, 0.9);
+    }
+
+    .result-row.selected {
+      background: #e0ecff;
+      border-color: #2563eb;
+    }
+
+    .result-term {
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .result-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .badge-status {
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      background: #ecfeff;
+      color: #0369a1;
+    }
+
+    .badge-workflow {
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .empty-state,
+    .error-state {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      padding: 30px 12px 10px;
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 2px solid #d1d5db;
+      border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    mark {
+      background: #fef3c7;
+      padding: 0 1px;
+      border-radius: 2px;
+    }
+
+    /* Right column: details */
+    .right-column {
+      flex: 1.2;
+      min-width: 0;
+      border-radius: 16px;
+      background: #f9fafb;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      padding: 12px 14px 14px;
+      max-height: 460px;
+      overflow-y: auto;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .detail-term {
+      font-size: 1.05rem;
+      font-weight: 650;
+    }
+
+    .detail-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 0.75rem;
+    }
+
+    .tag {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .tag-pos {
+      background: #ede9fe;
+      color: #4c1d95;
+    }
+
+    .tag-status {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .tag-workflow {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .section-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      margin: 10px 0 4px;
+    }
+
+    .definition-text {
+      font-size: 0.9rem;
+      color: #111827;
+      line-height: 1.4;
+    }
+
+    .small-text {
+      font-size: 0.78rem;
+      color: #4b5563;
+      line-height: 1.35;
+    }
+
+    .synonym-list, .related-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .syn-item, .rel-item {
+      padding: 4px 6px;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: baseline;
+    }
+
+    .syn-main, .rel-main {
+      font-size: 0.86rem;
+      font-weight: 500;
+    }
+
+    .syn-meta, .rel-meta {
+      font-size: 0.75rem;
+      color: #6b7280;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .pill-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 0.75rem;
+      text-decoration: none;
+    }
+
+    .pill-muted {
+      background: #f3f4f6;
+      color: #4b5563;
+    }
+
+    .placeholder-detail {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      padding-top: 80px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="title-row">
+        <div class="logo-dot">T</div>
+        <div>
+          <h1>Terminology Search</h1>
+          <p class="subtitle">
+            Search your termbase, filter by workflow status, and view synonyms and related terms in context.
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <!-- LEFT: SEARCH & LIST -->
+      <section class="left-column">
+        <div class="controls">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input
+              id="searchInput"
+              type="text"
+              class="search-input"
+              placeholder="Search by term, definition, synonyms, or related terms…"
+              autocomplete="off"
+            />
+            <button id="clearBtn" class="clear-btn" aria-label="Clear search">×</button>
+          </div>
+
+          <div class="filter-group">
+            <span>Workflow status:</span>
+            <select id="workflowFilter" class="select">
+              <option value="">All</option>
+            </select>
+          </div>
+
+          <div class="meta">
+            <span id="statusText">Loading data…</span>
+          </div>
+        </div>
+
+        <div id="resultsList" class="results-list"></div>
+      </section>
+
+      <!-- RIGHT: DETAILS -->
+      <section id="detailPanel" class="right-column">
+        <div class="placeholder-detail">
+          Select a term from the list to view its definition, synonyms, and related terms.
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycby_A0CyqhezoTyT6gUHqJ4XtgB-rnJYyl3TwQFfF9yj3yBsFVwbeN9YTmxjazKCmHw7/exec"; // <-- paste Apps Script Web App URL
+
+    const searchInput = document.getElementById("searchInput");
+    const clearBtn = document.getElementById("clearBtn");
+    const resultsList = document.getElementById("resultsList");
+    const workflowFilter = document.getElementById("workflowFilter");
+    const statusText = document.getElementById("statusText");
+    const detailPanel = document.getElementById("detailPanel");
+
+    let allTerms = [];
+    let filteredTerms = [];
+    let lastQuery = "";
+    let selectedTermId = null; // we'll use ID or Term as identifier
+
+    async function fetchData() {
+      statusText.textContent = "Loading data…";
+      resultsList.innerHTML = `
+        <div class="empty-state">
+          <div class="spinner"></div>
+          <div>Fetching terminology from Google Sheets…</div>
+        </div>
+      `;
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Network error");
+        const data = await res.json();
+        if (!data.success) throw new Error("API error");
+
+        allTerms = data.items || [];
+        buildWorkflowOptions(allTerms);
+        applyFilters();
+        statusText.innerHTML = `
+          <span class="chip">
+            ${allTerms.length} term${allTerms.length === 1 ? "" : "s"} loaded
+          </span>
+        `;
+      } catch (err) {
+        console.error(err);
+        resultsList.innerHTML = `
+          <div class="error-state">
+            <div>⚠️ Unable to load terminology.</div>
+            <div style="margin-top:4px;font-size:0.82rem;">
+              Check that your Apps Script web app is deployed and the URL is correct.
+            </div>
+          </div>
+        `;
+        statusText.textContent = "Error loading data";
+      }
+    }
+
+    function buildWorkflowOptions(items) {
+      const set = new Set();
+      items.forEach(it => {
+        const wf = String(it["Workflow status"] || "").trim();
+        if (wf) set.add(wf);
+      });
+      const options = Array.from(set).sort();
+      // Clear except first "All" option
+      while (workflowFilter.options.length > 1) {
+        workflowFilter.remove(1);
+      }
+      options.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        workflowFilter.appendChild(opt);
+      });
+    }
+
+    function applyFilters() {
+      const q = lastQuery.trim().toLowerCase();
+      const wf = workflowFilter.value.trim().toLowerCase();
+
+      filteredTerms = allTerms.filter(item => {
+        // Workflow status filter
+        if (wf) {
+          const wfVal = String(item["Workflow status"] || "").toLowerCase();
+          if (!wfVal.includes(wf)) return false;
+        }
+
+        // Text query filter
+        if (!q) return true;
+        const haystack = [
+          item["Term"],
+          item["Definition"],
+          item["Synonyms"],
+          item["Related terms"]
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+
+      renderResultList();
+    }
+
+    function highlight(text, query) {
+      if (!query) return text;
+      const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
+      const re = new RegExp(`(${q})`, "ig");
+      return text.replace(re, "<mark>$1</mark>");
+    }
+
+    function renderResultList() {
+      const q = lastQuery.trim().toLowerCase();
+      if (!filteredTerms.length) {
+        resultsList.innerHTML = `
+          <div class="empty-state">
+            <div>No matching terms found.</div>
+            <div style="font-size:0.8rem;margin-top:4px;">
+              Try a different keyword or adjust the workflow status filter.
+            </div>
+          </div>
+        `;
+        // If selected term is now filtered out, clear detail
+        if (selectedTermId) {
+          detailPanel.innerHTML = `
+            <div class="placeholder-detail">
+              No term selected. Adjust filters or search to continue.
+            </div>
+          `;
+        }
+        return;
+      }
+
+      resultsList.innerHTML = filteredTerms
+        .map(item => {
+          const id = String(item["ID"] || item["Term"]);
+          const term = String(item["Term"] || "").trim();
+          const def = String(item["Definition"] || "").trim();
+          const status = String(item["Status"] || "").trim();
+          const wf = String(item["Workflow status"] || "").trim();
+
+          const isSelected = id === selectedTermId;
+          return `
+            <div class="result-row ${isSelected ? "selected" : ""}" data-id="${id}">
+              <div>
+                <div class="result-term">${highlight(term || "(Untitled term)", q)}</div>
+                <div class="result-meta">
+                  ${status ? `<span class="badge-status">${status}</span>` : ""}
+                  ${wf ? `<span class="badge-workflow">${wf}</span>` : ""}
+                  ${
+                    def
+                      ? `<span>${highlight(shorten(def, 70), q)}</span>`
+                      : ""
+                  }
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      // Add click handlers
+      Array.from(resultsList.querySelectorAll(".result-row")).forEach(row => {
+        row.addEventListener("click", () => {
+          const id = row.getAttribute("data-id");
+          selectTermById(id);
+        });
+      });
+
+      // If none selected yet, select first item
+      if (!selectedTermId && filteredTerms.length > 0) {
+        const firstId = String(filteredTerms[0]["ID"] || filteredTerms[0]["Term"]);
+        selectTermById(firstId, false);
+      }
+    }
+
+    function shorten(text, maxLen) {
+      if (text.length <= maxLen) return text;
+      return text.slice(0, maxLen - 1) + "…";
+    }
+
+    function selectTermById(id, scrollToRow = true) {
+      selectedTermId = id;
+      const item = allTerms.find(it => String(it["ID"] || it["Term"]) === id);
+      if (!item) return;
+
+      // Re-render list to update selected styling
+      renderResultList();
+
+      // Scroll selected into view
+      if (scrollToRow) {
+        const row = resultsList.querySelector(`.result-row[data-id="${CSS.escape(id)}"]`);
+        if (row && typeof row.scrollIntoView === "function") {
+          row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
+      }
+
+      renderDetail(item);
+    }
+
+    function parseListField(value) {
+      if (!value) return [];
+      return String(value)
+        .split(/[,;]/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function renderDetail(item) {
+      const term = String(item["Term"] || "").trim();
+      const pos = String(item["Part of speech"] || "").trim();
+      const form = String(item["Form"] || "").trim();
+      const status = String(item["Status"] || "").trim();
+      const wf = String(item["Workflow status"] || "").trim();
+      const audience = String(item["Audience"] || "").trim();
+      const def = String(item["Definition"] || "").trim();
+      const usageGuidelines = String(item["Usage guidelines"] || "").trim();
+      const example = String(item["Usage example"] || "").trim();
+      const usageLink = String(item["Usage link"] || "").trim();
+      const defSource = String(item["Definition Source"] || "").trim();
+      const termImportedFrom = String(item["Term Imported From"] || "").trim();
+      const researchLink = String(item["Links to term research"] || "").trim();
+      const industryTerm = String(item["Industry term"] || "").trim();
+      const locDomain = String(item["Loc Domain"] || "").trim();
+      const taxonomy = String(item["Taxonomy"] || "").trim();
+      const notes = String(item["Notes"] || "").trim();
+
+      // Synonyms / related terms: lists
+      const synonyms = parseListField(item["Synonyms"]);
+      const related = parseListField(item["Related terms"]);
+
+      // Look up rows for each synonym & related term
+      const byTerm = buildTermIndex(allTerms); // map term -> row
+
+      const synonymDetails = synonyms.map(name => {
+        const row = byTerm[name.toLowerCase()];
+        return {
+          name,
+          pos: row ? String(row["Part of speech"] || "").trim() : "",
+          status: row ? String(row["Status"] || "").trim() : "",
+          workflow: row ? String(row["Workflow status"] || "").trim() : ""
+        };
+      });
+
+      const relatedDetails = related.map(name => {
+        const row = byTerm[name.toLowerCase()];
+        return {
+          name,
+          pos: row ? String(row["Part of speech"] || "").trim() : "",
+          status: row ? String(row["Status"] || "").trim() : "",
+          workflow: row ? String(row["Workflow status"] || "").trim() : ""
+        };
+      });
+
+      detailPanel.innerHTML = `
+        <div class="detail-header">
+          <div>
+            <div class="detail-term">${term || "(Untitled term)"}</div>
+            <div class="detail-tags">
+              ${pos ? `<span class="tag tag-pos">${pos}</span>` : ""}
+              ${form ? `<span class="tag">${form}</span>` : ""}
+              ${status ? `<span class="tag tag-status">${status}</span>` : ""}
+              ${wf ? `<span class="tag tag-workflow">${wf}</span>` : ""}
+              ${audience ? `<span class="tag">${audience}</span>` : ""}
+              ${industryTerm ? `<span class="tag">${industryTerm}</span>` : ""}
+            </div>
+          </div>
+        </div>
+
+        ${
+          def
+            ? `
+              <div class="section-title">Definition</div>
+              <div class="definition-text">${def}</div>
+            `
+            : ""
+        }
+
+        ${
+          usageGuidelines
+            ? `
+              <div class="section-title">Usage guidelines</div>
+              <div class="small-text">${usageGuidelines}</div>
+            `
+            : ""
+        }
+
+        ${
+          example || usageLink
+            ? `
+              <div class="section-title">Usage example</div>
+              <div class="small-text">
+                ${example ? `<div>${example}</div>` : ""}
+                ${
+                  usageLink
+                    ? `<div style="margin-top:4px;">
+                        <a class="pill-link" href="${usageLink}" target="_blank" rel="noopener noreferrer">
+                          🔗 Example link
+                        </a>
+                      </div>`
+                    : ""
+                }
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          synonymDetails.length
+            ? `
+              <div class="section-title">Synonyms</div>
+              <div class="synonym-list">
+                ${synonymDetails
+                  .map(s => `
+                    <div class="syn-item">
+                      <div class="syn-main">${s.name}</div>
+                      <div class="syn-meta">
+                        ${s.pos ? `<span>${s.pos}</span>` : ""}
+                        ${s.status ? `<span>${s.status}</span>` : ""}
+                        ${s.workflow ? `<span>${s.workflow}</span>` : ""}
+                      </div>
+                    </div>
+                  `)
+                  .join("")}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          relatedDetails.length
+            ? `
+              <div class="section-title" style="opacity:0.8;">Related terms</div>
+              <div class="related-list" style="opacity:0.9;">
+                ${relatedDetails
+                  .map(r => `
+                    <div class="rel-item">
+                      <div class="rel-main">${r.name}</div>
+                      <div class="rel-meta">
+                        ${r.pos ? `<span>${r.pos}</span>` : ""}
+                        ${r.status ? `<span>${r.status}</span>` : ""}
+                        ${r.workflow ? `<span>${r.workflow}</span>` : ""}
+                      </div>
+                    </div>
+                  `)
+                  .join("")}
+              </div>
+            `
+            : ""
+        }
+
+        ${
+          (termImportedFrom || defSource || researchLink || locDomain || taxonomy || notes)
+            ? `
+              <div class="section-title">Metadata</div>
+              <div class="small-text">
+                ${
+                  termImportedFrom
+                    ? `<div><strong>Term imported from:</strong> ${termImportedFrom}</div>`
+                    : ""
+                }
+                ${
+                  defSource
+                    ? `<div><strong>Definition source:</strong> ${defSource}</div>`
+                    : ""
+                }
+                ${
+                  locDomain
+                    ? `<div><strong>Loc domain:</strong> ${locDomain}</div>`
+                    : ""
+                }
+                ${
+                  taxonomy
+                    ? `<div><strong>Taxonomy:</strong> ${taxonomy}</div>`
+                    : ""
+                }
+                ${
+                  researchLink
+                    ? `<div style="margin-top:4px;">
+                        <a class="pill-link pill-muted" href="${researchLink}" target="_blank" rel="noopener noreferrer">
+                          🔗 Term research
+                        </a>
+                      </div>`
+                    : ""
+                }
+                ${
+                  notes
+                    ? `<div style="margin-top:4px;"><strong>Notes:</strong> ${notes}</div>`
+                    : ""
+                }
+              </div>
+            `
+            : ""
+        }
+      `;
+    }
+
+    function buildTermIndex(items) {
+      const map = {};
+      items.forEach(it => {
+        const t = String(it["Term"] || "").trim();
+        if (!t) return;
+        map[t.toLowerCase()] = it;
+      });
+      return map;
+    }
+
+    // Debounced search
+    let debounceTimer;
+    function onSearchInput(e) {
+      const value = e.target.value;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        lastQuery = value;
+        applyFilters();
+      }, 150);
+      clearBtn.classList.toggle("visible", value.length > 0);
+    }
+
+    // Clear search
+    clearBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      clearBtn.classList.remove("visible");
+      lastQuery = "";
+      applyFilters();
+      searchInput.focus();
+    });
+
+    searchInput.addEventListener("input", onSearchInput);
+    workflowFilter.addEventListener("change", () => {
+      applyFilters();
+    });
+
+    // Initial load
+    fetchData();
+  </script>
+</body>
+</html>
