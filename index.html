@@ -423,6 +423,40 @@
       color: var(--text-muted);
       padding-top: 80px;
     }
+    /* Clickable synonyms and related terms */
+.syn-item.clickable,
+.rel-item.clickable {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.syn-item.clickable:hover,
+.rel-item.clickable:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.term-link {
+  color: #2563eb;
+  text-decoration: underline;
+  text-decoration-color: rgba(37, 99, 235, 0.3);
+  text-underline-offset: 2px;
+}
+
+.syn-item.clickable:hover .term-link,
+.rel-item.clickable:hover .term-link {
+  text-decoration-color: #2563eb;
+}
+
+.not-found-badge {
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #9ca3af;
+  margin-left: 6px;
+  font-style: italic;
+}
   </style>
 </head>
 <body>
@@ -480,433 +514,431 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycby_A0CyqhezoTyT6gUHqJ4XtgB-rnJYyl3TwQFfF9yj3yBsFVwbeN9YTmxjazKCmHw7/exec"; // <-- paste Apps Script Web App URL
+    const API_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"; // keep your existing URL
 
-    const searchInput = document.getElementById("searchInput");
-    const clearBtn = document.getElementById("clearBtn");
-    const resultsList = document.getElementById("resultsList");
-    const workflowFilter = document.getElementById("workflowFilter");
-    const statusText = document.getElementById("statusText");
-    const detailPanel = document.getElementById("detailPanel");
+const searchInput = document.getElementById("searchInput");
+const clearBtn = document.getElementById("clearBtn");
+const resultsList = document.getElementById("resultsList");
+const workflowFilter = document.getElementById("workflowFilter");
+const statusText = document.getElementById("statusText");
+const detailPanel = document.getElementById("detailPanel");
 
-    let allTerms = [];
-    let filteredTerms = [];
-    let lastQuery = "";
-    let selectedTermId = null; // we'll use ID or Term as identifier
+let allTerms = [];
+let filteredTerms = [];
+let lastQuery = "";
+let selectedTermId = null;
 
-    async function fetchData() {
-      statusText.textContent = "Loading data…";
-      resultsList.innerHTML = `
-        <div class="empty-state">
-          <div class="spinner"></div>
-          <div>Fetching terminology from Google Sheets…</div>
+async function fetchData() {
+  statusText.textContent = "Loading data…";
+  resultsList.innerHTML = `
+    <div class="empty-state">
+      <div class="spinner"></div>
+      <div>Fetching terminology from Google Sheets…</div>
+    </div>
+  `;
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error("Network error");
+    const data = await res.json();
+    if (!data.success) throw new Error("API error");
+
+    // Filter out empty rows (no Term)
+    allTerms = (data.items || []).filter(item => String(item["Term"] || "").trim() !== "");
+    
+    buildWorkflowOptions(allTerms);
+    applyFilters();
+    statusText.innerHTML = `
+      <span class="chip">
+        ${allTerms.length} term${allTerms.length === 1 ? "" : "s"} loaded
+      </span>
+    `;
+  } catch (err) {
+    console.error(err);
+    resultsList.innerHTML = `
+      <div class="error-state">
+        <div>⚠️ Unable to load terminology.</div>
+        <div style="margin-top:4px;font-size:0.82rem;">
+          Check that your Apps Script web app is deployed and the URL is correct.
+        </div>
+      </div>
+    `;
+    statusText.textContent = "Error loading data";
+  }
+}
+
+function buildWorkflowOptions(items) {
+  const set = new Set();
+  items.forEach(it => {
+    const wf = String(it["Workflow status"] || "").trim();
+    if (wf) set.add(wf);
+  });
+  const options = Array.from(set).sort();
+  while (workflowFilter.options.length > 1) {
+    workflowFilter.remove(1);
+  }
+  options.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    workflowFilter.appendChild(opt);
+  });
+}
+
+function applyFilters() {
+  const q = lastQuery.trim().toLowerCase();
+  const wf = workflowFilter.value.trim().toLowerCase();
+
+  filteredTerms = allTerms.filter(item => {
+    if (wf) {
+      const wfVal = String(item["Workflow status"] || "").toLowerCase();
+      if (!wfVal.includes(wf)) return false;
+    }
+    if (!q) return true;
+    const haystack = [
+      item["Term"],
+      item["Definition"],
+      item["Synonyms"],
+      item["Related terms"]
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(q);
+  });
+
+  renderResultList();
+}
+
+function highlight(text, query) {
+  if (!query) return text;
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${q})`, "ig");
+  return text.replace(re, "<mark>$1</mark>");
+}
+
+function renderResultList() {
+  const q = lastQuery.trim().toLowerCase();
+  if (!filteredTerms.length) {
+    resultsList.innerHTML = `
+      <div class="empty-state">
+        <div>No matching terms found.</div>
+        <div style="font-size:0.8rem;margin-top:4px;">
+          Try a different keyword or adjust the workflow status filter.
+        </div>
+      </div>
+    `;
+    if (selectedTermId) {
+      detailPanel.innerHTML = `
+        <div class="placeholder-detail">
+          No term selected. Adjust filters or search to continue.
         </div>
       `;
-      try {
-        const res = await fetch(API_URL);
-        if (!res.ok) throw new Error("Network error");
-        const data = await res.json();
-        if (!data.success) throw new Error("API error");
-
-        allTerms = data.items || [];
-        buildWorkflowOptions(allTerms);
-        applyFilters();
-        statusText.innerHTML = `
-          <span class="chip">
-            ${allTerms.length} term${allTerms.length === 1 ? "" : "s"} loaded
-          </span>
-        `;
-      } catch (err) {
-        console.error(err);
-        resultsList.innerHTML = `
-          <div class="error-state">
-            <div>⚠️ Unable to load terminology.</div>
-            <div style="margin-top:4px;font-size:0.82rem;">
-              Check that your Apps Script web app is deployed and the URL is correct.
-            </div>
-          </div>
-        `;
-        statusText.textContent = "Error loading data";
-      }
     }
+    return;
+  }
 
-    function buildWorkflowOptions(items) {
-      const set = new Set();
-      items.forEach(it => {
-        const wf = String(it["Workflow status"] || "").trim();
-        if (wf) set.add(wf);
-      });
-      const options = Array.from(set).sort();
-      // Clear except first "All" option
-      while (workflowFilter.options.length > 1) {
-        workflowFilter.remove(1);
-      }
-      options.forEach(v => {
-        const opt = document.createElement("option");
-        opt.value = v;
-        opt.textContent = v;
-        workflowFilter.appendChild(opt);
-      });
-    }
-
-    function applyFilters() {
-      const q = lastQuery.trim().toLowerCase();
-      const wf = workflowFilter.value.trim().toLowerCase();
-
-      filteredTerms = allTerms.filter(item => {
-        // Workflow status filter
-        if (wf) {
-          const wfVal = String(item["Workflow status"] || "").toLowerCase();
-          if (!wfVal.includes(wf)) return false;
-        }
-
-        // Text query filter
-        if (!q) return true;
-        const haystack = [
-          item["Term"],
-          item["Definition"],
-          item["Synonyms"],
-          item["Related terms"]
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(q);
-      });
-
-      renderResultList();
-    }
-
-    function highlight(text, query) {
-      if (!query) return text;
-      const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
-      const re = new RegExp(`(${q})`, "ig");
-      return text.replace(re, "<mark>$1</mark>");
-    }
-
-    function renderResultList() {
-      const q = lastQuery.trim().toLowerCase();
-      if (!filteredTerms.length) {
-        resultsList.innerHTML = `
-          <div class="empty-state">
-            <div>No matching terms found.</div>
-            <div style="font-size:0.8rem;margin-top:4px;">
-              Try a different keyword or adjust the workflow status filter.
-            </div>
-          </div>
-        `;
-        // If selected term is now filtered out, clear detail
-        if (selectedTermId) {
-          detailPanel.innerHTML = `
-            <div class="placeholder-detail">
-              No term selected. Adjust filters or search to continue.
-            </div>
-          `;
-        }
-        return;
-      }
-
-      resultsList.innerHTML = filteredTerms
-        .map(item => {
-          const id = String(item["ID"] || item["Term"]);
-          const term = String(item["Term"] || "").trim();
-          const def = String(item["Definition"] || "").trim();
-          const status = String(item["Status"] || "").trim();
-          const wf = String(item["Workflow status"] || "").trim();
-
-          const isSelected = id === selectedTermId;
-          return `
-            <div class="result-row ${isSelected ? "selected" : ""}" data-id="${id}">
-              <div>
-                <div class="result-term">${highlight(term || "(Untitled term)", q)}</div>
-                <div class="result-meta">
-                  ${status ? `<span class="badge-status">${status}</span>` : ""}
-                  ${wf ? `<span class="badge-workflow">${wf}</span>` : ""}
-                  ${
-                    def
-                      ? `<span>${highlight(shorten(def, 70), q)}</span>`
-                      : ""
-                  }
-                </div>
-              </div>
-            </div>
-          `;
-        })
-        .join("");
-
-      // Add click handlers
-      Array.from(resultsList.querySelectorAll(".result-row")).forEach(row => {
-        row.addEventListener("click", () => {
-          const id = row.getAttribute("data-id");
-          selectTermById(id);
-        });
-      });
-
-      // If none selected yet, select first item
-      if (!selectedTermId && filteredTerms.length > 0) {
-        const firstId = String(filteredTerms[0]["ID"] || filteredTerms[0]["Term"]);
-        selectTermById(firstId, false);
-      }
-    }
-
-    function shorten(text, maxLen) {
-      if (text.length <= maxLen) return text;
-      return text.slice(0, maxLen - 1) + "…";
-    }
-
-    function selectTermById(id, scrollToRow = true) {
-      selectedTermId = id;
-      const item = allTerms.find(it => String(it["ID"] || it["Term"]) === id);
-      if (!item) return;
-
-      // Re-render list to update selected styling
-      renderResultList();
-
-      // Scroll selected into view
-      if (scrollToRow) {
-        const row = resultsList.querySelector(`.result-row[data-id="${CSS.escape(id)}"]`);
-        if (row && typeof row.scrollIntoView === "function") {
-          row.scrollIntoView({ block: "nearest", behavior: "smooth" });
-        }
-      }
-
-      renderDetail(item);
-    }
-
-    function parseListField(value) {
-      if (!value) return [];
-      return String(value)
-        .split(/[,;]/)
-        .map(s => s.trim())
-        .filter(Boolean);
-    }
-
-    function renderDetail(item) {
+  resultsList.innerHTML = filteredTerms
+    .map(item => {
+      const id = String(item["ID"] || item["Term"]);
       const term = String(item["Term"] || "").trim();
-      const pos = String(item["Part of speech"] || "").trim();
-      const form = String(item["Form"] || "").trim();
+      const def = String(item["Definition"] || "").trim();
       const status = String(item["Status"] || "").trim();
       const wf = String(item["Workflow status"] || "").trim();
-      const audience = String(item["Audience"] || "").trim();
-      const def = String(item["Definition"] || "").trim();
-      const usageGuidelines = String(item["Usage guidelines"] || "").trim();
-      const example = String(item["Usage example"] || "").trim();
-      const usageLink = String(item["Usage link"] || "").trim();
-      const defSource = String(item["Definition Source"] || "").trim();
-      const termImportedFrom = String(item["Term Imported From"] || "").trim();
-      const researchLink = String(item["Links to term research"] || "").trim();
-      const industryTerm = String(item["Industry term"] || "").trim();
-      const locDomain = String(item["Loc Domain"] || "").trim();
-      const taxonomy = String(item["Taxonomy"] || "").trim();
-      const notes = String(item["Notes"] || "").trim();
 
-      // Synonyms / related terms: lists
-      const synonyms = parseListField(item["Synonyms"]);
-      const related = parseListField(item["Related terms"]);
-
-      // Look up rows for each synonym & related term
-      const byTerm = buildTermIndex(allTerms); // map term -> row
-
-      const synonymDetails = synonyms.map(name => {
-        const row = byTerm[name.toLowerCase()];
-        return {
-          name,
-          pos: row ? String(row["Part of speech"] || "").trim() : "",
-          status: row ? String(row["Status"] || "").trim() : "",
-          workflow: row ? String(row["Workflow status"] || "").trim() : ""
-        };
-      });
-
-      const relatedDetails = related.map(name => {
-        const row = byTerm[name.toLowerCase()];
-        return {
-          name,
-          pos: row ? String(row["Part of speech"] || "").trim() : "",
-          status: row ? String(row["Status"] || "").trim() : "",
-          workflow: row ? String(row["Workflow status"] || "").trim() : ""
-        };
-      });
-
-      detailPanel.innerHTML = `
-        <div class="detail-header">
+      const isSelected = id === selectedTermId;
+      return `
+        <div class="result-row ${isSelected ? "selected" : ""}" data-id="${escapeAttr(id)}">
           <div>
-            <div class="detail-term">${term || "(Untitled term)"}</div>
-            <div class="detail-tags">
-              ${pos ? `<span class="tag tag-pos">${pos}</span>` : ""}
-              ${form ? `<span class="tag">${form}</span>` : ""}
-              ${status ? `<span class="tag tag-status">${status}</span>` : ""}
-              ${wf ? `<span class="tag tag-workflow">${wf}</span>` : ""}
-              ${audience ? `<span class="tag">${audience}</span>` : ""}
-              ${industryTerm ? `<span class="tag">${industryTerm}</span>` : ""}
+            <div class="result-term">${highlight(term || "(Untitled term)", q)}</div>
+            <div class="result-meta">
+              ${status ? `<span class="badge-status">${escapeHtml(status)}</span>` : ""}
+              ${wf ? `<span class="badge-workflow">${escapeHtml(wf)}</span>` : ""}
+              ${def ? `<span>${highlight(shorten(def, 70), q)}</span>` : ""}
             </div>
           </div>
         </div>
-
-        ${
-          def
-            ? `
-              <div class="section-title">Definition</div>
-              <div class="definition-text">${def}</div>
-            `
-            : ""
-        }
-
-        ${
-          usageGuidelines
-            ? `
-              <div class="section-title">Usage guidelines</div>
-              <div class="small-text">${usageGuidelines}</div>
-            `
-            : ""
-        }
-
-        ${
-          example || usageLink
-            ? `
-              <div class="section-title">Usage example</div>
-              <div class="small-text">
-                ${example ? `<div>${example}</div>` : ""}
-                ${
-                  usageLink
-                    ? `<div style="margin-top:4px;">
-                        <a class="pill-link" href="${usageLink}" target="_blank" rel="noopener noreferrer">
-                          🔗 Example link
-                        </a>
-                      </div>`
-                    : ""
-                }
-              </div>
-            `
-            : ""
-        }
-
-        ${
-          synonymDetails.length
-            ? `
-              <div class="section-title">Synonyms</div>
-              <div class="synonym-list">
-                ${synonymDetails
-                  .map(s => `
-                    <div class="syn-item">
-                      <div class="syn-main">${s.name}</div>
-                      <div class="syn-meta">
-                        ${s.pos ? `<span>${s.pos}</span>` : ""}
-                        ${s.status ? `<span>${s.status}</span>` : ""}
-                        ${s.workflow ? `<span>${s.workflow}</span>` : ""}
-                      </div>
-                    </div>
-                  `)
-                  .join("")}
-              </div>
-            `
-            : ""
-        }
-
-        ${
-          relatedDetails.length
-            ? `
-              <div class="section-title" style="opacity:0.8;">Related terms</div>
-              <div class="related-list" style="opacity:0.9;">
-                ${relatedDetails
-                  .map(r => `
-                    <div class="rel-item">
-                      <div class="rel-main">${r.name}</div>
-                      <div class="rel-meta">
-                        ${r.pos ? `<span>${r.pos}</span>` : ""}
-                        ${r.status ? `<span>${r.status}</span>` : ""}
-                        ${r.workflow ? `<span>${r.workflow}</span>` : ""}
-                      </div>
-                    </div>
-                  `)
-                  .join("")}
-              </div>
-            `
-            : ""
-        }
-
-        ${
-          (termImportedFrom || defSource || researchLink || locDomain || taxonomy || notes)
-            ? `
-              <div class="section-title">Metadata</div>
-              <div class="small-text">
-                ${
-                  termImportedFrom
-                    ? `<div><strong>Term imported from:</strong> ${termImportedFrom}</div>`
-                    : ""
-                }
-                ${
-                  defSource
-                    ? `<div><strong>Definition source:</strong> ${defSource}</div>`
-                    : ""
-                }
-                ${
-                  locDomain
-                    ? `<div><strong>Loc domain:</strong> ${locDomain}</div>`
-                    : ""
-                }
-                ${
-                  taxonomy
-                    ? `<div><strong>Taxonomy:</strong> ${taxonomy}</div>`
-                    : ""
-                }
-                ${
-                  researchLink
-                    ? `<div style="margin-top:4px;">
-                        <a class="pill-link pill-muted" href="${researchLink}" target="_blank" rel="noopener noreferrer">
-                          🔗 Term research
-                        </a>
-                      </div>`
-                    : ""
-                }
-                ${
-                  notes
-                    ? `<div style="margin-top:4px;"><strong>Notes:</strong> ${notes}</div>`
-                    : ""
-                }
-              </div>
-            `
-            : ""
-        }
       `;
-    }
+    })
+    .join("");
 
-    function buildTermIndex(items) {
-      const map = {};
-      items.forEach(it => {
-        const t = String(it["Term"] || "").trim();
-        if (!t) return;
-        map[t.toLowerCase()] = it;
-      });
-      return map;
-    }
-
-    // Debounced search
-    let debounceTimer;
-    function onSearchInput(e) {
-      const value = e.target.value;
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        lastQuery = value;
-        applyFilters();
-      }, 150);
-      clearBtn.classList.toggle("visible", value.length > 0);
-    }
-
-    // Clear search
-    clearBtn.addEventListener("click", () => {
-      searchInput.value = "";
-      clearBtn.classList.remove("visible");
-      lastQuery = "";
-      applyFilters();
-      searchInput.focus();
+  Array.from(resultsList.querySelectorAll(".result-row")).forEach(row => {
+    row.addEventListener("click", () => {
+      const id = row.getAttribute("data-id");
+      selectTermById(id);
     });
+  });
 
-    searchInput.addEventListener("input", onSearchInput);
-    workflowFilter.addEventListener("change", () => {
-      applyFilters();
+  if (!selectedTermId && filteredTerms.length > 0) {
+    const firstId = String(filteredTerms[0]["ID"] || filteredTerms[0]["Term"]);
+    selectTermById(firstId, false);
+  }
+}
+
+function shorten(text, maxLen) {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen - 1) + "…";
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeAttr(text) {
+  return String(text).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function selectTermById(id, scrollToRow = true) {
+  selectedTermId = id;
+  const item = allTerms.find(it => String(it["ID"] || it["Term"]) === id);
+  if (!item) return;
+
+  renderResultList();
+
+  if (scrollToRow) {
+    const row = resultsList.querySelector(`.result-row[data-id="${CSS.escape(id)}"]`);
+    if (row && typeof row.scrollIntoView === "function") {
+      row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
+  renderDetail(item);
+}
+
+// Navigate to a term by name (used for clickable synonyms/related terms)
+function navigateToTerm(termName) {
+  const normalized = termName.trim().toLowerCase();
+  const item = allTerms.find(it => String(it["Term"] || "").trim().toLowerCase() === normalized);
+  
+  if (item) {
+    // Clear filters to ensure the term is visible
+    searchInput.value = "";
+    lastQuery = "";
+    workflowFilter.value = "";
+    
+    // Reset to show all terms
+    filteredTerms = allTerms;
+    
+    // Select the term
+    const id = String(item["ID"] || item["Term"]);
+    selectedTermId = id;
+    
+    renderResultList();
+    
+    // Scroll to it
+    const row = resultsList.querySelector(`.result-row[data-id="${CSS.escape(id)}"]`);
+    if (row) {
+      row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+    
+    renderDetail(item);
+  } else {
+    // Term not found in database — search for it instead
+    searchInput.value = termName;
+    lastQuery = termName;
+    clearBtn.classList.add("visible");
+    applyFilters();
+  }
+}
+
+function parseListField(value) {
+  if (!value) return [];
+  return String(value)
+    .split(/[,;]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function buildTermIndex(items) {
+  const map = {};
+  items.forEach(it => {
+    const t = String(it["Term"] || "").trim();
+    if (!t) return;
+    map[t.toLowerCase()] = it;
+  });
+  return map;
+}
+
+function renderDetail(item) {
+  const term = String(item["Term"] || "").trim();
+  const pos = String(item["Part of speech"] || "").trim();
+  const form = String(item["Form"] || "").trim();
+  const status = String(item["Status"] || "").trim();
+  const wf = String(item["Workflow status"] || "").trim();
+  const audience = String(item["Audience"] || "").trim();
+  const def = String(item["Definition"] || "").trim();
+  const usageGuidelines = String(item["Usage guidelines"] || "").trim();
+  const example = String(item["Usage example"] || "").trim();
+  const usageLink = String(item["Usage link"] || "").trim();
+  const defSource = String(item["Definition Source"] || "").trim();
+  const termImportedFrom = String(item["Term Imported From"] || "").trim();
+  const researchLink = String(item["Links to term research"] || "").trim();
+  const industryTerm = String(item["Industry term"] || "").trim();
+  const locDomain = String(item["Loc Domain"] || "").trim();
+  const taxonomy = String(item["Taxonomy"] || "").trim();
+  const notes = String(item["Notes"] || "").trim();
+
+  const synonyms = parseListField(item["Synonyms"]);
+  const related = parseListField(item["Related terms"]);
+
+  const byTerm = buildTermIndex(allTerms);
+
+  // Build synonym details with clickable links
+  const synonymDetails = synonyms.map(name => {
+    const row = byTerm[name.toLowerCase()];
+    return {
+      name,
+      exists: !!row,
+      pos: row ? String(row["Part of speech"] || "").trim() : "",
+      status: row ? String(row["Status"] || "").trim() : "",
+      workflow: row ? String(row["Workflow status"] || "").trim() : ""
+    };
+  });
+
+  // Build related term details with clickable links
+  const relatedDetails = related.map(name => {
+    const row = byTerm[name.toLowerCase()];
+    return {
+      name,
+      exists: !!row,
+      pos: row ? String(row["Part of speech"] || "").trim() : "",
+      status: row ? String(row["Status"] || "").trim() : "",
+      workflow: row ? String(row["Workflow status"] || "").trim() : ""
+    };
+  });
+
+  detailPanel.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-term">${escapeHtml(term) || "(Untitled term)"}</div>
+        <div class="detail-tags">
+          ${pos ? `<span class="tag tag-pos">${escapeHtml(pos)}</span>` : ""}
+          ${form ? `<span class="tag">${escapeHtml(form)}</span>` : ""}
+          ${status ? `<span class="tag tag-status">${escapeHtml(status)}</span>` : ""}
+          ${wf ? `<span class="tag tag-workflow">${escapeHtml(wf)}</span>` : ""}
+          ${audience ? `<span class="tag">${escapeHtml(audience)}</span>` : ""}
+          ${industryTerm && industryTerm !== "false" ? `<span class="tag">Industry term</span>` : ""}
+        </div>
+      </div>
+    </div>
+
+    ${def ? `
+      <div class="section-title">Definition</div>
+      <div class="definition-text">${escapeHtml(def)}</div>
+    ` : ""}
+
+    ${usageGuidelines ? `
+      <div class="section-title">Usage guidelines</div>
+      <div class="small-text">${escapeHtml(usageGuidelines)}</div>
+    ` : ""}
+
+    ${example || usageLink ? `
+      <div class="section-title">Usage example</div>
+      <div class="small-text">
+        ${example ? `<div>${escapeHtml(example)}</div>` : ""}
+        ${usageLink ? `
+          <div style="margin-top:4px;">
+            <a class="pill-link" href="${escapeAttr(usageLink)}" target="_blank" rel="noopener noreferrer">
+              🔗 Example link
+            </a>
+          </div>
+        ` : ""}
+      </div>
+    ` : ""}
+
+    ${synonymDetails.length ? `
+      <div class="section-title">Synonyms</div>
+      <div class="synonym-list">
+        ${synonymDetails.map(s => `
+          <div class="syn-item ${s.exists ? 'clickable' : ''}" ${s.exists ? `data-term="${escapeAttr(s.name)}"` : ""}>
+            <div class="syn-main">
+              ${s.exists ? `<span class="term-link">${escapeHtml(s.name)}</span>` : escapeHtml(s.name)}
+              ${!s.exists ? `<span class="not-found-badge">not in database</span>` : ""}
+            </div>
+            <div class="syn-meta">
+              ${s.pos ? `<span>${escapeHtml(s.pos)}</span>` : ""}
+              ${s.status ? `<span>${escapeHtml(s.status)}</span>` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    ${relatedDetails.length ? `
+      <div class="section-title" style="opacity:0.8;">Related terms</div>
+      <div class="related-list" style="opacity:0.9;">
+        ${relatedDetails.map(r => `
+          <div class="rel-item ${r.exists ? 'clickable' : ''}" ${r.exists ? `data-term="${escapeAttr(r.name)}"` : ""}>
+            <div class="rel-main">
+              ${r.exists ? `<span class="term-link">${escapeHtml(r.name)}</span>` : escapeHtml(r.name)}
+              ${!r.exists ? `<span class="not-found-badge">not in database</span>` : ""}
+            </div>
+            <div class="rel-meta">
+              ${r.pos ? `<span>${escapeHtml(r.pos)}</span>` : ""}
+              ${r.status ? `<span>${escapeHtml(r.status)}</span>` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    ` : ""}
+
+    ${(termImportedFrom || defSource || researchLink || locDomain || taxonomy || notes) ? `
+      <div class="section-title">Metadata</div>
+      <div class="small-text">
+        ${termImportedFrom ? `<div><strong>Term imported from:</strong> ${escapeHtml(termImportedFrom)}</div>` : ""}
+        ${defSource ? `<div><strong>Definition source:</strong> ${escapeHtml(defSource)}</div>` : ""}
+        ${locDomain ? `<div><strong>Loc domain:</strong> ${escapeHtml(locDomain)}</div>` : ""}
+        ${taxonomy ? `<div><strong>Taxonomy:</strong> ${escapeHtml(taxonomy)}</div>` : ""}
+        ${researchLink ? `
+          <div style="margin-top:4px;">
+            <a class="pill-link pill-muted" href="${escapeAttr(researchLink)}" target="_blank" rel="noopener noreferrer">
+              🔗 Term research
+            </a>
+          </div>
+        ` : ""}
+        ${notes ? `<div style="margin-top:4px;"><strong>Notes:</strong> ${escapeHtml(notes)}</div>` : ""}
+      </div>
+    ` : ""}
+  `;
+
+  // Add click handlers for synonyms and related terms
+  detailPanel.querySelectorAll(".syn-item.clickable, .rel-item.clickable").forEach(el => {
+    el.addEventListener("click", () => {
+      const termName = el.getAttribute("data-term");
+      if (termName) {
+        navigateToTerm(termName);
+      }
     });
+  });
+}
 
-    // Initial load
-    fetchData();
+// Debounced search
+let debounceTimer;
+function onSearchInput(e) {
+  const value = e.target.value;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    lastQuery = value;
+    applyFilters();
+  }, 150);
+  clearBtn.classList.toggle("visible", value.length > 0);
+}
+
+clearBtn.addEventListener("click", () => {
+  searchInput.value = "";
+  clearBtn.classList.remove("visible");
+  lastQuery = "";
+  applyFilters();
+  searchInput.focus();
+});
+
+searchInput.addEventListener("input", onSearchInput);
+workflowFilter.addEventListener("change", () => {
+  applyFilters();
+});
+
+// Initial load
+fetchData();
   </script>
 </body>
 </html>
