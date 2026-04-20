@@ -120,7 +120,8 @@
 
     .search-box {
       position: relative;
-      flex: 1 1 240px;
+      flex: 1 1 260px;          
+      min-width: 200px;
     }
 
     .search-input {
@@ -175,6 +176,37 @@
       gap: 4px;
       font-size: 0.8rem;
       color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .jira-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid #1d4ed8;
+      background: #ffffff;
+      color: #1d4ed8;
+      font-size: 0.86rem;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
+      transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+      flex: 0 0 auto;           /* prevent it from growing across the row */
+    }
+
+    .jira-btn:hover {
+      background: #eff6ff;
+      color: #1d4ed8;
+      box-shadow: 0 5px 12px rgba(37, 99, 235, 0.28);
+    }
+
+    .jira-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
     }
 
     .select {
@@ -190,6 +222,8 @@
     .meta {
       font-size: 0.78rem;
       color: var(--text-muted);
+      flex: 0 1 auto;
+      min-width: 0;
     }
 
     .chip {
