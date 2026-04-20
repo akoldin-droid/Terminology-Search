@@ -476,29 +476,41 @@
     <div class="layout">
       <!-- LEFT: SEARCH & LIST -->
       <section class="left-column">
+        
         <div class="controls">
-          <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input
-              id="searchInput"
-              type="text"
-              class="search-input"
-              placeholder="Search terms..."
-              autocomplete="off"
-            />
-            <button id="clearBtn" class="clear-btn" aria-label="Clear search">×</button>
-          </div>
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input
+      id="searchInput"
+      type="text"
+      class="search-input"
+      placeholder="Search terms..."
+      autocomplete="off"
+    />
+    <button id="clearBtn" class="clear-btn" aria-label="Clear search">×</button>
+  </div>
 
-          <div class="filter-group">
-            <span>Workflow status:</span>
-            <select id="workflowFilter" class="select">
-              <option value="">All</option>
-            </select>
-          </div>
+  <div class="filter-group">
+    <span>Workflow status:</span>
+    <select id="workflowFilter" class="select">
+      <option value="">All</option>
+    </select>
+  </div>
 
-          <div class="meta">
-            <span id="statusText">Loading data…</span>
-          </div>
+  <div class="meta">
+    <span id="statusText">Loading data…</span>
+  </div>
+
+  <!-- Jira term request button -->
+  <a
+    href="https://netflix.atlassian.net/jira/software/c/projects/GAMESXD/form/3829"
+    class="jira-btn"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    + Request new term
+  </a>
+</div>
         </div>
 
         <div id="resultsList" class="results-list"></div>
