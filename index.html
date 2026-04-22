@@ -634,22 +634,70 @@ function applyFilters() {
   const q = lastQuery.trim().toLowerCase();
   const wf = workflowFilter.value.trim().toLowerCase();
 
-  filteredTerms = allTerms.filter(item => {
-    if (wf) {
-      const wfVal = String(item["Workflow status"] || "").toLowerCase();
-      if (!wfVal.includes(wf)) return false;
-    }
-    if (!q) return true;
-    const haystack = [
-      item["Term"],
-      item["Definition"],
-      item["Synonyms"],
-      item["Related terms"]
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(q);
-  });
+  // Filter and score results
+  const scoredTerms = allTerms
+    .map(item => {
+      // Check workflow filter first
+      if (wf) {
+        const wfVal = String(item["Workflow status"] || "").toLowerCase();
+        if (!wfVal.includes(wf)) return null;
+      }
+
+      // If no query, include all (with score 0)
+      if (!q) {
+        return { item, score: 0 };
+      }
+
+      // Calculate relevance score based on where match is found
+      let score = 0;
+      
+      const termName = String(item["Term"] || "").toLowerCase();
+      const definition = String(item["Definition"] || "").toLowerCase();
+      const synonyms = String(item["Synonyms"] || "").toLowerCase();
+      const relatedTerms = String(item["Related terms"] || "").toLowerCase();
+
+      // Scoring weights (higher = more relevant)
+      if (termName.includes(q)) {
+        // Bonus for exact match or starts-with
+        if (termName === q) {
+          score += 1000; // Exact match
+        } else if (termName.startsWith(q)) {
+          score += 500;  // Starts with query
+        } else {
+          score += 100;  // Contains query
+        }
+      }
+      
+      if (definition.includes(q)) {
+        score += 30;
+      }
+      
+      if (synonyms.includes(q)) {
+        score += 20;
+      }
+      
+      if (relatedTerms.includes(q)) {
+        score += 10;
+      }
+
+      // No match anywhere = exclude
+      if (score === 0) return null;
+
+      return { item, score };
+    })
+    .filter(Boolean) // Remove nulls
+    .sort((a, b) => {
+      // Sort by score descending, then alphabetically by term name
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      const termA = String(a.item["Term"] || "").toLowerCase();
+      const termB = String(b.item["Term"] || "").toLowerCase();
+      return termA.localeCompare(termB);
+    });
+
+  // Extract just the items for the rest of the code
+  filteredTerms = scoredTerms.map(s => s.item);
 
   renderResultList();
 }
